@@ -6,6 +6,7 @@
 var SS_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 var SH_PRODUK = 'PRODUK';
 var SH_MASTER = 'MASTER DISTRIBUSI';
+var SH_AUTH = 'Auth_';
 
 // ── PRODUK column indices (col B "NAMA BARANG" sudah di-drop)
 // A=0  B=1       C=2          D=3       E=4       F=5    G=6  H=7
@@ -55,6 +56,19 @@ var MD_KET       = 17;
 // ═══════════════════════════════════════════════════════════
 
 function doGet() {
+  // Check session
+  var session = checkSession();
+
+  if (!session.authenticated) {
+    // Not authenticated - show login page
+    return HtmlService
+      .createHtmlOutputFromFile('lib/Auth/Login')
+      .setTitle('Login - Stok PBF')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+
+  // Authenticated - show main app
   return HtmlService
     .createHtmlOutputFromFile('index')
     .setTitle('Stok PBF')
@@ -67,6 +81,18 @@ function doGet() {
 // ═══════════════════════════════════════════════════════════
 
 function handleRequest(action, params) {
+  // Auth actions (bypass session check)
+  if (action === 'login') return authenticateUser(params.username, params.password);
+  if (action === 'checkSession') return checkSession();
+  if (action === 'logout') return logout();
+
+  // Session validation for all other actions
+  var session = checkSession();
+  if (!session.authenticated) {
+    return { error: 'Session expired. Please login again.', requiresAuth: true };
+  }
+
+  // Existing actions
   switch (action) {
     case 'searchProduct':      return searchProduct(params.query);
     case 'getProductList':     return getProductList();
