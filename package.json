@@ -1,0 +1,14 @@
+{
+  "name": "stok-pbf",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "push": "git add . && git commit -m \"update\" && git push && clasp push"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.28.2"
+}

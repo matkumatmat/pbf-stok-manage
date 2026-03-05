@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stok PBF</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
+        .nav-glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .card-hover { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+        .card-hover:hover { transform: translateY(-1px); box-shadow: 0 8px 16px -4px rgba(0,0,0,0.08); }
+        .table-wrap { max-height: 480px; overflow-y: auto; }
+        .table-wrap thead th { position: sticky; top: 0; z-index: 10; }
+        .toggle-track { transition: background-color 0.2s ease; }
+        .toggle-knob { transition: transform 0.2s ease; }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0px); }
+        /* Mobile optimization */
+        @media (max-width: 640px) {
+            body { text-[12px]; }
+            main { padding-left: 12px; padding-right: 12px; }
+            .table-wrap { max-height: 400px; -webkit-overflow-scrolling: touch; }
+            .table-wrap table { font-size: 10px; }
+            .table-wrap th, .table-wrap td { padding: 6px 8px !important; white-space: nowrap; }
+            .grid.grid-cols-3 { gap: 6px; }
+            .grid.grid-cols-3 > div { padding: 10px; }
+            h1 { font-size: 16px; }
+        }
+        .spinner {
+            width: 44px; height: 44px;
+            animation: spinner-y0fdc1 2s infinite ease;
+            transform-style: preserve-3d;
+        }
+        .spinner > div {
+            background-color: rgba(0,77,255,0.2);
+            height: 100%; position: absolute; width: 100%;
+            border: 2px solid #004dff;
+        }
+        .spinner div:nth-of-type(1) { transform: translateZ(-22px) rotateY(180deg); }
+        .spinner div:nth-of-type(2) { transform: rotateY(-270deg) translateX(50%); transform-origin: top right; }
+        .spinner div:nth-of-type(3) { transform: rotateY(270deg) translateX(-50%); transform-origin: center left; }
+        .spinner div:nth-of-type(4) { transform: rotateX(90deg) translateY(-50%); transform-origin: top center; }
+        .spinner div:nth-of-type(5) { transform: rotateX(-90deg) translateY(50%); transform-origin: bottom center; }
+        .spinner div:nth-of-type(6) { transform: translateZ(22px); }
+        @keyframes spinner-y0fdc1 {
+            0% { transform: rotate(45deg) rotateX(-25deg) rotateY(25deg); }
+            50% { transform: rotate(45deg) rotateX(-385deg) rotateY(25deg); }
+            100% { transform: rotate(45deg) rotateX(-385deg) rotateY(385deg); }
+        }
+    </style>
+</head>
+<body class="bg-[#f8fafb] text-slate-700 min-h-screen text-[13px]">
+
+    <!-- Top Header (brand only) -->
+    <header class="fixed top-0 inset-x-0 nav-glass border-b border-slate-200/60 z-50">
+        <div class="max-w-5xl mx-auto px-5 flex items-center h-12">
+            <div class="flex items-center gap-2.5">
+                <div class="w-6 h-6 bg-sky-600 rounded-md flex items-center justify-center">
+                    <div color="white" data-lucide="package" class="w-4 h-4"></div>
+                </div>
+                <span class="font-bold text-xs tracking-tight text-slate-900 uppercase">PBF System</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Bottom Navigation -->
+    <nav id="bottom-nav" class="fixed bottom-0 inset-x-0 nav-glass border-t border-slate-200/60 z-50 safe-bottom">
+        <div class="max-w-5xl mx-auto flex justify-around items-center h-16">
+            <button onclick="switchTab('distribusi')" id="bnav-distribusi" class="flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all text-slate-400">
+                <div data-lucide="truck" class="w-5 h-5"></div>
+                <span class="text-[10px] font-bold">Distribusi</span>
+            </button>
+            <button onclick="switchTab('produk')" id="bnav-produk" class="flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all text-sky-600 bg-sky-50">
+                <div data-lucide="box" class="w-5 h-5"></div>
+                <span class="text-[10px] font-bold">Produk</span>
+            </button>
+            <button onclick="switchTab('embalage')" id="bnav-embalage" class="flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all text-slate-400">
+                <div data-lucide="flask-conical" class="w-5 h-5"></div>
+                <span class="text-[10px] font-bold">Embalage</span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="pt-16 pb-24 px-5 max-w-5xl mx-auto">
+
+        <!-- Error -->
+        <div id="error-alert" class="hidden mb-5 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg text-xs font-medium">
+            <span id="error-msg"></span>
+        </div>
+
+        <!-- ============================================ -->
+        <!-- TAB 1: PRODUK                                -->
+        <!-- ============================================ -->
+        <section id="tab-produk" class="space-y-6">
+            <div>
+                <h1 class="text-lg font-bold text-slate-900 tracking-tight">Inventaris Produk</h1>
+                <p class="text-slate-400 text-xs mt-0.5">Ketik untuk filter berdasarkan nama, kode, atau jenis produk.</p>
+            </div>
+
+            <!-- Search -->
+            <div id="search-box" class="bg-white p-1 rounded-xl shadow-sm border border-slate-200/80">
+                <div class="flex">
+                    <div class="flex-1 relative flex items-center">
+                        <svg class="absolute left-3.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <input type="text" id="input-search" oninput="filterProducts()" onkeydown="if(event.key==='Enter')filterProducts()" placeholder="Filter nama, kode, atau batch..." class="w-full pl-10 pr-3 py-3 rounded-l-xl text-slate-800 text-xs outline-none placeholder:text-slate-400">
+                    </div>
+                    <button onclick="filterProducts()" class="px-6 py-2.5 m-0.5 bg-sky-600 text-white text-xs font-semibold rounded-lg hover:bg-sky-700 active:scale-[0.97] transition-all">Cari</button>
+                </div>
+            </div>
+
+            <!-- Search Results -->
+            <div id="search-results" class="hidden space-y-3">
+                <div class="flex items-center justify-between px-1">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hasil Pencarian</span>
+                    <span id="result-count" class="text-[10px] text-slate-400"></span>
+                </div>
+                <div id="result-list" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+            </div>
+
+            <div id="search-empty" class="hidden py-14 text-center">
+                <p class="text-slate-400 text-xs font-medium">Tidak ada produk ditemukan</p>
+            </div>
+
+            <div id="search-loading" class="hidden py-14 flex justify-center items-center">
+                <div class="spinner">
+                    <div></div><div></div><div></div><div></div><div></div><div></div>
+                </div>
+            </div>
+
+            <!-- Product Detail -->
+            <div id="product-detail" class="hidden space-y-5">
+                <div class="flex items-start gap-3 border-b border-slate-200 pb-5">
+                    <button onclick="backToSearch()" class="mt-0.5 p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-500 transition-all">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    </button>
+                    <div class="flex-1 min-w-0">
+                        <h2 id="det-nama" class="text-base font-extrabold text-slate-900 tracking-tight truncate"></h2>
+                        <p id="det-erp" class="text-[10px] text-slate-400 mt-0.5 truncate"></p>
+                        <div class="flex flex-wrap gap-1.5 mt-2">
+                            <span id="det-kode-lama" class="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-mono font-semibold"></span>
+                            <span id="det-kode-baru" class="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[10px] font-mono font-semibold"></span>
+                            <span id="det-kategori" class="px-1.5 py-0.5 bg-sky-50 text-sky-600 rounded text-[10px] font-bold uppercase"></span>
+                            <span id="det-jenis" class="px-1.5 py-0.5 bg-emerald-50 text-emerald-600 rounded text-[10px] font-bold uppercase"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-6">
+                    <div>
+                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">HJP</p>
+                        <p id="det-hjp" class="text-sm font-bold text-slate-900 mt-0.5"></p>
+                    </div>
+                    <div class="border-l border-slate-200 pl-6">
+                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">HET</p>
+                        <p id="det-het" class="text-sm font-bold text-slate-400 mt-0.5"></p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="p-4 bg-white border border-slate-200 rounded-xl">
+                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Penerimaan</p>
+                        <p id="det-pen" class="text-xl font-bold text-slate-900 mt-1"></p>
+                    </div>
+                    <div class="p-4 bg-white border border-slate-200 rounded-xl">
+                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Distribusi</p>
+                        <p id="det-dist" class="text-xl font-bold text-slate-900 mt-1"></p>
+                    </div>
+                    <div id="det-stok-card" class="p-4 rounded-xl border">
+                        <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Stok</p>
+                        <p id="det-stok" class="text-xl font-bold mt-1"></p>
+                    </div>
+                </div>
+
+                <!-- Batch Table — now with MFG column -->
+                <div>
+                    <h3 class="text-xs font-bold text-slate-900 mb-2">Stok per Batch</h3>
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3">Batch</th>
+                                        <th class="px-4 py-3">MFG</th>
+                                        <th class="px-4 py-3">Expire</th>
+                                        <th class="px-4 py-3">Status</th>
+                                        <th class="px-4 py-3 text-right">Masuk</th>
+                                        <th class="px-4 py-3 text-right">Keluar</th>
+                                        <th class="px-4 py-3 text-right">Saldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="det-batch-body" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-xs font-bold text-slate-900 mb-2">Riwayat per Konsumen</h3>
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3">Konsumen</th>
+                                        <th class="px-4 py-3 text-right">Masuk (+)</th>
+                                        <th class="px-4 py-3 text-right">Keluar (-)</th>
+                                        <th class="px-4 py-3 text-right">Net</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="det-riwayat-body" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============================================ -->
+        <!-- TAB 2: DISTRIBUSI                            -->
+        <!-- ============================================ -->
+        <section id="tab-distribusi" class="hidden space-y-6">
+            <div>
+                <h1 class="text-lg font-bold text-slate-900 tracking-tight">Distribusi & Logistik</h1>
+                <p class="text-slate-400 text-xs mt-0.5">Monitor pengiriman dan stok opname.</p>
+            </div>
+
+            <div class="inline-flex p-0.5 bg-slate-100 rounded-lg">
+                <button onclick="switchSub('pengiriman')" id="sub-btn-pengiriman" class="px-4 py-1.5 text-[11px] font-bold rounded-md bg-white text-slate-900 shadow-sm">Pengiriman</button>
+                <button onclick="switchSub('cycle')" id="sub-btn-cycle" class="px-4 py-1.5 text-[11px] font-bold rounded-md text-slate-400 hover:text-slate-700">Cycle Count</button>
+                <button onclick="switchSub('batch')" id="sub-btn-batch" class="px-4 py-1.5 text-[11px] font-bold rounded-md text-slate-400 hover:text-slate-700">Batch Record</button>
+            </div>
+
+            <!-- ---- PENGIRIMAN ---- -->
+            <div id="sub-pengiriman" class="space-y-5">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 items-end">
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Dari</label>
+                            <input type="date" id="p-start" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Sampai</label>
+                            <input type="date" id="p-end" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Konsumen</label>
+                            <select id="p-konsumen" onchange="onKonsumenChange()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400">
+                                <option value="">Semua</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Kota</label>
+                            <select id="p-kota" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400" disabled>
+                                <option value="">Semua</option>
+                            </select>
+                        </div>
+                        <button onclick="fetchPengiriman()" class="bg-slate-900 text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-black active:scale-[0.97] transition-all col-span-2 sm:col-span-1">Tampilkan</button>
+                    </div>
+                </div>
+
+                <div id="p-toggle-row" class="hidden flex items-center gap-2.5 px-1">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mode Ringkas</span>
+                    <button onclick="togglePMode()" id="p-toggle" class="relative w-9 h-5 rounded-full toggle-track bg-slate-200 cursor-pointer" role="switch" aria-checked="false">
+                        <span class="toggle-knob absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm"></span>
+                    </button>
+                </div>
+
+                <div id="p-results" class="hidden space-y-3">
+                    <div class="bg-sky-50 border border-sky-100 px-4 py-2.5 rounded-lg flex items-center gap-2">
+                        <div class="w-1.5 h-1.5 bg-sky-500 rounded-full animate-pulse"></div>
+                        <span id="p-summary" class="text-[11px] font-bold text-sky-900"></span>
+                    </div>
+                    <!-- Detail table -->
+                    <div id="p-table-detail" class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3">Tanggal</th>
+                                        <th class="px-4 py-3">No Dokumen</th>
+                                        <th class="px-4 py-3">Konsumen</th>
+                                        <th class="px-4 py-3">Kota</th>
+                                        <th class="px-4 py-3">Produk</th>
+                                        <th class="px-4 py-3">Batch</th>
+                                        <th class="px-4 py-3 text-right">Qty</th>
+                                        <th class="px-4 py-3">Keterangan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p-tbody-detail" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <!-- Summary table — with MFG/Expire -->
+                    <div id="p-table-summary" class="hidden bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3">Produk</th>
+                                        <th class="px-4 py-3">Batch</th>
+                                        <th class="px-4 py-3">MFG / Expire</th>
+                                        <th class="px-4 py-3 text-right">Total Qty</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="p-tbody-summary" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- CYCLE COUNT ---- -->
+            <div id="sub-cycle" class="hidden space-y-5">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="grid grid-cols-2 gap-3 items-end">
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Tanggal Opname</label>
+                            <input type="date" id="c-date" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400">
+                        </div>
+                        <button onclick="fetchCycleCount()" class="bg-emerald-600 text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-emerald-700 active:scale-[0.97] transition-all">Hitung</button>
+                    </div>
+                </div>
+
+                <div id="c-results" class="hidden space-y-4">
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="p-4 bg-slate-900 rounded-xl text-white">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Masuk Hari Ini</p>
+                            <p id="c-pen" class="text-lg font-bold mt-1"></p>
+                        </div>
+                        <div class="p-4 bg-white border border-slate-200 rounded-xl">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Keluar Hari Ini</p>
+                            <p id="c-dist" class="text-lg font-bold text-slate-900 mt-1"></p>
+                        </div>
+                        <div class="p-4 bg-white border border-slate-200 rounded-xl">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Stok s/d Tanggal</p>
+                            <p id="c-stok" class="text-lg font-bold text-sky-600 mt-1"></p>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3">Produk</th>
+                                        <th class="px-4 py-3">Batch</th>
+                                        <th class="px-4 py-3">MFG / Expire</th>
+                                        <th class="px-4 py-3 text-right">Masuk</th>
+                                        <th class="px-4 py-3 text-right">Keluar</th>
+                                        <th class="px-4 py-3 text-right">Stok Akhir</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="c-tbody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- BATCH RECORD ---- -->
+            <div id="sub-batch" class="hidden space-y-5">
+                <!-- Search -->
+                <div class="bg-white p-1 rounded-xl shadow-sm border border-slate-200/80">
+                    <div class="flex">
+                        <div class="flex-1 relative flex items-center">
+                            <svg class="absolute left-3.5 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            <input type="text" id="br-search" onkeydown="if(event.key==='Enter')searchBatchRecord()" placeholder="Cari nama produk, kode, atau batch..." class="w-full pl-10 pr-3 py-3 rounded-l-xl text-slate-800 text-xs outline-none placeholder:text-slate-400">
+                        </div>
+                        <button onclick="searchBatchRecord()" class="px-6 py-2.5 m-0.5 bg-sky-600 text-white text-xs font-semibold rounded-lg hover:bg-sky-700 active:scale-[0.97] transition-all">Cari</button>
+                    </div>
+                </div>
+
+                <!-- Batch cards -->
+                <div id="br-cards" class="hidden space-y-3">
+                    <div class="flex items-center justify-between px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pilih Batch</span>
+                        <span id="br-card-count" class="text-[10px] text-slate-400"></span>
+                    </div>
+                    <div id="br-card-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3"></div>
+                </div>
+
+                <div id="br-empty" class="hidden py-14 text-center">
+                    <p class="text-slate-400 text-xs font-medium">Tidak ada batch ditemukan</p>
+                </div>
+
+                <!-- <div id="br-loading" class="hidden py-14 flex flex-col items-center gap-3">
+                    <div class="w-8 h-8 border-[3px] border-slate-200 border-t-sky-600 rounded-full animate-spin"></div>
+                    <span class="text-slate-400 text-xs">Mencari batch...</span>
+                </div> -->
+                <div id="br-loading" class="hidden py-14 flex justify-center items-center">
+                    <div class="spinner">
+                        <div></div><div></div><div></div><div></div><div></div><div></div>
+                    </div>
+                </div>                
+
+                <!-- Batch Detail -->
+                <div id="br-detail" class="hidden space-y-5">
+                    <!-- Back + Info header -->
+                    <div class="flex items-start gap-3">
+                        <button onclick="backToBatchCards()" class="mt-0.5 p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-500 transition-all">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        </button>
+                        <div class="flex-1 min-w-0">
+                            <h3 id="br-det-nama" class="text-sm font-extrabold text-slate-900 tracking-tight"></h3>
+                            <div class="flex flex-wrap gap-3 mt-2">
+                                <div>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase">Batch</span>
+                                    <p id="br-det-batch" class="font-mono text-xs font-semibold text-slate-800"></p>
+                                </div>
+                                <div>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase">MFG</span>
+                                    <p id="br-det-mfg" class="text-xs text-slate-600"></p>
+                                </div>
+                                <div>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase">Expire</span>
+                                    <p id="br-det-expire" class="text-xs text-slate-600"></p>
+                                </div>
+                                <div>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase">Status</span>
+                                    <p id="br-det-status" class="text-xs font-semibold"></p>
+                                </div>
+                                <div>
+                                    <span class="text-[9px] font-bold text-slate-400 uppercase">Stok Akhir</span>
+                                    <p id="br-det-stok" class="text-sm font-extrabold text-sky-600"></p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="exportBatch()" id="br-export-btn" class="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-[10px] font-bold rounded-lg hover:bg-emerald-700 active:scale-[0.97] transition-all shrink-0">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Export
+                        </button>
+                    </div>
+
+                    <!-- Transaction table -->
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3">Tanggal</th>
+                                        <th class="px-4 py-3">Konsumen</th>
+                                        <th class="px-4 py-3">Kota</th>
+                                        <th class="px-4 py-3 text-right">Masuk</th>
+                                        <th class="px-4 py-3 text-right">Keluar</th>
+                                        <th class="px-4 py-3 text-right">Stok</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="br-tbody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- <div id="dist-loading" class="hidden py-14 flex flex-col items-center gap-3">
+                <div class="w-8 h-8 border-[3px] border-slate-200 border-t-sky-600 rounded-full animate-spin"></div>
+                <span class="text-slate-400 text-xs">Mengolah data...</span>
+            </div> -->
+
+            <div id="dist-loading" class="hidden py-14 flex justify-center items-center">
+                <div class="spinner">
+                    <div></div><div></div><div></div><div></div><div></div><div></div>
+                </div>
+            </div>            
+        </section>
+
+        <!-- ============================================ -->
+        <!-- TAB 3: EMBALAGE                              -->
+        <!-- ============================================ -->
+        <section id="tab-embalage" class="hidden space-y-6">
+            <div>
+                <h1 class="text-lg font-bold text-slate-900 tracking-tight">Embalage</h1>
+                <p class="text-slate-400 text-xs mt-0.5">Manajemen embalage, input penerimaan, dan history pengiriman.</p>
+            </div>
+
+            <div class="inline-flex p-0.5 bg-slate-100 rounded-lg">
+                <button onclick="switchEmb('emb-dashboard')" id="emb-btn-dashboard" class="px-4 py-1.5 text-[11px] font-bold rounded-md bg-white text-slate-900 shadow-sm">Dashboard</button>
+                <button onclick="switchEmb('emb-input')" id="emb-btn-input" class="px-4 py-1.5 text-[11px] font-bold rounded-md text-slate-400 hover:text-slate-700">Input</button>
+                <button onclick="switchEmb('emb-output')" id="emb-btn-output" class="px-4 py-1.5 text-[11px] font-bold rounded-md text-slate-400 hover:text-slate-700">Output</button>
+                <button onclick="switchEmb('emb-history')" id="emb-btn-history" class="px-4 py-1.5 text-[11px] font-bold rounded-md text-slate-400 hover:text-slate-700">History</button>
+            </div>
+
+            <!-- DASHBOARD -->
+            <div id="emb-dashboard" class="space-y-4">
+                <div id="emb-dash-loading" class="hidden py-14 flex justify-center items-center">
+                    <div class="spinner"><div></div><div></div><div></div><div></div><div></div><div></div></div>
+                </div>
+                <div id="emb-dash-content" class="hidden space-y-4">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div class="p-3 bg-white border border-slate-200 rounded-xl">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Item</p>
+                            <p id="emb-total-items" class="text-lg font-bold text-slate-900 mt-1">0</p>
+                        </div>
+                        <div class="p-3 bg-white border border-slate-200 rounded-xl">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Low Stock</p>
+                            <p id="emb-below-safety" class="text-lg font-bold text-red-500 mt-1">0</p>
+                        </div>
+                        <div class="p-3 bg-white border border-slate-200 rounded-xl">
+                            <p class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Reorder</p>
+                            <p id="emb-need-reorder" class="text-lg font-bold text-amber-500 mt-1">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 overflow-x-auto">
+                        <div id="emb-chart" class="space-y-1.5" style="min-width:300px;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INPUT -->
+            <div id="emb-input" class="hidden space-y-5">
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <h3 class="text-xs font-bold text-slate-900">Input Penerimaan Embalage</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Tanggal</label>
+                            <input type="date" id="emb-in-tgl" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Nomor BON</label>
+                            <input type="text" id="emb-in-bon" placeholder="Opsional" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Barang</label>
+                            <select id="emb-in-barang" onchange="onEmbBarangChange()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                                <option value="">Pilih barang...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Jumlah</label>
+                            <input type="number" id="emb-in-jumlah" min="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Satuan</label>
+                            <input type="text" id="emb-in-satuan" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Keterangan</label>
+                            <input type="text" id="emb-in-ket" placeholder="Opsional" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                        </div>
+                    </div>
+                    <button onclick="submitEmbalagePenerimaan()" id="emb-in-submit" class="w-full bg-sky-600 text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-sky-700 active:scale-[0.97] transition-all">Simpan Penerimaan</button>
+                </div>
+
+                <!-- History penerimaan -->
+                <div>
+                    <h3 class="text-xs font-bold text-slate-900 mb-2">Riwayat Penerimaan</h3>
+                    <div id="emb-in-loading" class="hidden py-10 flex justify-center"><div class="spinner"><div></div><div></div><div></div><div></div><div></div><div></div></div></div>
+                    <div id="emb-in-history" class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3">No</th>
+                                        <th class="px-4 py-3">Tanggal</th>
+                                        <th class="px-4 py-3">No. BON</th>
+                                        <th class="px-4 py-3">Barang</th>
+                                        <th class="px-4 py-3 text-right">Jumlah</th>
+                                        <th class="px-4 py-3">Satuan</th>
+                                        <th class="px-4 py-3">Ket</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="emb-in-tbody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- OUTPUT (Pengeluaran history) -->
+            <div id="emb-output" class="hidden space-y-4">
+                <h3 class="text-xs font-bold text-slate-900">Riwayat Pengeluaran Embalage</h3>
+                <div id="emb-out-loading" class="hidden py-10 flex justify-center"><div class="spinner"><div></div><div></div><div></div><div></div><div></div><div></div></div></div>
+                <div id="emb-out-content" class="hidden space-y-3">
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-3 py-2">No</th>
+                                        <th class="px-3 py-2">Tanggal</th>
+                                        <th class="px-3 py-2">No. Packing</th>
+                                        <th class="px-3 py-2">Barang</th>
+                                        <th class="px-3 py-2 text-right">Jumlah</th>
+                                        <th class="px-3 py-2">Satuan</th>
+                                        <th class="px-3 py-2">Ket</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="emb-out-tbody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center gap-2 pt-1">
+                        <button onclick="loadPengeluaranHistory(embOutPage-1)" id="emb-out-prev" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-30" disabled>Prev</button>
+                        <span id="emb-out-page-info" class="text-[10px] text-slate-400"></span>
+                        <button onclick="loadPengeluaranHistory(embOutPage+1)" id="emb-out-next" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-30" disabled>Next</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HISTORY (Distribusi/Pengiriman) -->
+            <div id="emb-history" class="hidden space-y-5">
+                <div id="emb-hist-loading" class="hidden py-14 flex justify-center items-center">
+                    <div class="spinner"><div></div><div></div><div></div><div></div><div></div><div></div></div>
+                </div>
+
+                <!-- List view -->
+                <div id="emb-hist-list" class="hidden space-y-3">
+                    <div class="flex items-center justify-between px-1">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">History Pengiriman</span>
+                        <span id="emb-hist-count" class="text-[10px] text-slate-400"></span>
+                    </div>
+                    <div id="emb-hist-cards" class="space-y-2"></div>
+                    <!-- Pagination -->
+                    <div id="emb-hist-pager" class="flex items-center justify-center gap-2 pt-2">
+                        <button onclick="loadDistribusiHistory(embHistPage-1)" id="emb-prev" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-30" disabled>Prev</button>
+                        <span id="emb-page-info" class="text-[10px] text-slate-400"></span>
+                        <button onclick="loadDistribusiHistory(embHistPage+1)" id="emb-next" class="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-500 hover:bg-slate-50 disabled:opacity-30" disabled>Next</button>
+                    </div>
+                </div>
+
+                <!-- Detail view -->
+                <div id="emb-hist-detail" class="hidden space-y-4">
+                    <div class="flex items-start gap-3">
+                        <button onclick="backToHistList()" class="mt-0.5 p-1.5 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-500 transition-all">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                        </button>
+                        <div class="flex-1">
+                            <h3 id="emb-hist-det-tujuan" class="text-sm font-extrabold text-slate-900"></h3>
+                            <div class="flex flex-wrap gap-3 mt-2">
+                                <div><span class="text-[9px] font-bold text-slate-400 uppercase">Tanggal</span><p id="emb-hist-det-tgl" class="text-xs text-slate-600"></p></div>
+                                <div><span class="text-[9px] font-bold text-slate-400 uppercase">No Dokumen</span><p id="emb-hist-det-dok" class="text-xs text-slate-600"></p></div>
+                                <div><span class="text-[9px] font-bold text-slate-400 uppercase">Berat</span><p id="emb-hist-det-berat" class="text-xs font-bold text-slate-800"></p></div>
+                                <div><span class="text-[9px] font-bold text-slate-400 uppercase">Forwarder</span><p id="emb-hist-det-fwd" class="text-xs font-bold text-sky-600"></p></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                        <div class="overflow-x-auto table-wrap">
+                            <table class="w-full text-xs text-left">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <tr>
+                                        <th class="px-4 py-3">Produk</th>
+                                        <th class="px-4 py-3">Batch</th>
+                                        <th class="px-4 py-3">Expire</th>
+                                        <th class="px-4 py-3 text-right">Distribusi</th>
+                                        <th class="px-4 py-3">Keterangan</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="emb-hist-det-tbody" class="divide-y divide-slate-100"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="emb-loading" class="hidden py-14 flex justify-center items-center">
+                <div class="spinner"><div></div><div></div><div></div><div></div><div></div><div></div></div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+    /* ───── State ───── */
+    let pSummaryMode = false;
+    let pRawData = [];
+    let distributorMap = null;
+    let allProducts = []; // loaded on init
+
+    /* ───── Formatting ───── */
+    const fmtN = n => (n == null ? '0' : n.toLocaleString('id-ID'));
+    const fmtR = n => (n == null || n === 0 ? '-' : 'Rp ' + n.toLocaleString('id-ID'));
+    const fmtD = s => { if(!s) return '-'; const p=s.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; };
+    const today = () => new Date().toISOString().split('T')[0];
+
+    /* ───── Helpers ───── */
+    function show(id) { document.getElementById(id).classList.remove('hidden'); }
+    function hide(id) { document.getElementById(id).classList.add('hidden'); }
+    function err(msg) {
+        if(msg){ document.getElementById('error-msg').innerText=msg; show('error-alert'); window.scrollTo({top:0,behavior:'smooth'}); }
+        else hide('error-alert');
+    }
+
+    /* ───── Tab Navigation ───── */
+    function switchTab(t) {
+        err(null);
+        ['produk','distribusi','embalage'].forEach(k => {
+            if(k===t) show('tab-'+k); else hide('tab-'+k);
+            const btn = document.getElementById('bnav-'+k);
+            if(k===t) {
+                btn.className = 'flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all text-sky-600 bg-sky-50';
+            } else {
+                btn.className = 'flex flex-col items-center gap-1 py-2 px-4 rounded-xl transition-all text-slate-400';
+            }
+        });
+        if(t === 'distribusi' && !distributorMap) loadDistributorList();
+        if(t === 'embalage' && !embDashLoaded) loadEmbalageDashboard();
+    }
+
+    function switchEmb(s) {
+        ['emb-dashboard','emb-input','emb-output','emb-history'].forEach(k => {
+            if(k===s) show(k); else hide(k);
+            const btnId = 'emb-btn-' + k.replace('emb-','');
+            const btn = document.getElementById(btnId);
+            btn.className = k===s
+                ? 'px-4 py-1.5 text-[11px] font-bold rounded-md bg-white text-slate-900 shadow-sm'
+                : 'px-4 py-1.5 text-[11px] font-bold rounded-md text-slate-400 hover:text-slate-700';
+        });
+        if(s === 'emb-dashboard' && !embDashLoaded) loadEmbalageDashboard();
+        if(s === 'emb-input' && !embInputLoaded) loadEmbalageInput();
+        if(s === 'emb-output' && !embOutLoaded) loadPengeluaranHistory(1);
+        if(s === 'emb-history' && !embHistLoaded) loadDistribusiHistory(1);
+    }
+
+    function loadDistributorList() {
+        google.script.run
+            .withSuccessHandler(res => {
+                distributorMap = res.distributor || {};
+                const sel = document.getElementById('p-konsumen');
+                sel.innerHTML = '<option value="">Semua</option>';
+                Object.keys(distributorMap).sort().forEach(k => {
+                    const opt = document.createElement('option');
+                    opt.value = k; opt.textContent = k;
+                    sel.appendChild(opt);
+                });
+            })
+            .withFailureHandler(() => {})
+            .handleRequest('getDistributorList', {});
+    }
+
+    function onKonsumenChange() {
+        const konsumen = document.getElementById('p-konsumen').value;
+        const selKota = document.getElementById('p-kota');
+        selKota.innerHTML = '<option value="">Semua</option>';
+        if(konsumen && distributorMap && distributorMap[konsumen]) {
+            selKota.disabled = false;
+            distributorMap[konsumen].forEach(k => {
+                const opt = document.createElement('option');
+                opt.value = k; opt.textContent = k;
+                selKota.appendChild(opt);
+            });
+        } else {
+            selKota.disabled = true;
+        }
+    }
+
+    function switchSub(s) {
+        ['pengiriman','cycle','batch'].forEach(k => {
+            if(k===s) show('sub-'+k); else hide('sub-'+k);
+            const btn = document.getElementById('sub-btn-'+k);
+            btn.className = k===s
+                ? 'px-4 py-1.5 text-[11px] font-bold rounded-md bg-white text-slate-900 shadow-sm'
+                : 'px-4 py-1.5 text-[11px] font-bold rounded-md text-slate-400 hover:text-slate-700';
+        });
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* TAB 1: PRODUK                              */
+    /* ═══════════════════════════════════════════ */
+
+    function loadAllProducts() {
+        hide('search-results'); hide('search-empty'); hide('product-detail');
+        show('search-loading');
+        google.script.run
+            .withSuccessHandler(res => {
+                allProducts = res.results || [];
+                hide('search-loading');
+                renderProductList(allProducts);
+            })
+            .withFailureHandler(e => { hide('search-loading'); err('Gagal memuat data produk: ' + e.message); })
+            .handleRequest('getProductList', {});
+    }
+
+    let filterTimer = null;
+    function filterProducts() {
+        clearTimeout(filterTimer);
+        filterTimer = setTimeout(() => {
+            const q = document.getElementById('input-search').value.trim().toLowerCase();
+            hide('product-detail');
+            if(!q) { renderProductList(allProducts); return; }
+            const filtered = allProducts.filter(item => {
+                const hay = [item.kodeLama, item.kodeBaru, item.namaDagang, item.namaERP, item.kategori, item.jenis].join(' ').toLowerCase();
+                return hay.indexOf(q) !== -1;
+            });
+            if(filtered.length > 0) {
+                renderProductList(filtered);
+            } else {
+                // Fallback: search server-side (supports batch search)
+                show('search-loading'); hide('search-results'); hide('search-empty');
+                google.script.run
+                    .withSuccessHandler(res => {
+                        hide('search-loading');
+                        if(res.results && res.results.length > 0) {
+                            renderProductList(res.results);
+                        } else {
+                            renderProductList([]);
+                        }
+                    })
+                    .withFailureHandler(() => { hide('search-loading'); renderProductList([]); })
+                    .handleRequest('searchProduct', { query: q });
+            }
+        }, 300);
+    }
+
+    function renderProductList(items) {
+        const list = document.getElementById('result-list');
+        list.innerHTML = '';
+        hide('search-empty');
+
+        if(!items || items.length === 0) { show('search-empty'); hide('search-results'); return; }
+
+        show('search-results');
+        document.getElementById('result-count').innerText = items.length + ' produk';
+
+        items.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'bg-white p-4 border border-slate-200 rounded-xl cursor-pointer card-hover group';
+            card.onclick = () => loadDetail(item.kodeBaru);
+            card.innerHTML = `
+                <div class="flex justify-between items-start gap-2">
+                    <h4 class="text-[11px] font-bold text-slate-900 group-hover:text-sky-600 transition-colors leading-snug">${item.namaDagang}</h4>
+                    <span class="text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded shrink-0">${item.kodeBaru}</span>
+                </div>
+                <div class="mt-2 flex items-center gap-1.5 flex-wrap">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase">${item.kategori}</span>
+                    <span class="w-0.5 h-0.5 bg-slate-300 rounded-full"></span>
+                    <span class="text-[9px] font-bold text-sky-500 uppercase">${item.jenis}</span>
+                    ${item.matchedBatch ? '<span class="text-[9px] text-amber-600 font-semibold">Batch: '+item.matchedBatch+'</span>' : ''}
+                </div>`;
+            list.appendChild(card);
+        });
+    }
+
+    function loadDetail(kode) {
+        err(null);
+        hide('search-results'); hide('search-empty'); hide('search-box');
+        show('search-loading');
+        google.script.run
+            .withSuccessHandler(onDetail)
+            .withFailureHandler(e => { hide('search-loading'); show('search-box'); filterProducts(); err('Gagal memuat detail: ' + e.message); })
+            .handleRequest('getProductDetail', { kodeBarang: kode });
+    }
+
+    function onDetail(d) {
+        hide('search-loading'); hide('search-box');
+        show('product-detail');
+
+        document.getElementById('det-nama').innerText = d.namaDagang || d.kodeBarang;
+        document.getElementById('det-erp').innerText = d.namaERP || '';
+        document.getElementById('det-kode-lama').innerText = d.kodeLama || '-';
+        document.getElementById('det-kode-baru').innerText = d.kodeBarang;
+        document.getElementById('det-kategori').innerText = d.kategori || '-';
+        document.getElementById('det-jenis').innerText = d.jenis || '-';
+        document.getElementById('det-hjp').innerText = fmtR(d.hjp);
+        document.getElementById('det-het').innerText = d.het ? fmtR(d.het) : '-';
+
+        document.getElementById('det-pen').innerText = fmtN(d.totalPenerimaan);
+        document.getElementById('det-dist').innerText = fmtN(d.totalDistribusi);
+        document.getElementById('det-stok').innerText = fmtN(d.totalStok);
+
+        const card = document.getElementById('det-stok-card');
+        card.className = d.totalStok > 0
+            ? 'p-4 rounded-xl border border-emerald-200 bg-emerald-50/60'
+            : 'p-4 rounded-xl border border-red-200 bg-red-50/60';
+
+        // Batch table — with MFG
+        const bBody = document.getElementById('det-batch-body');
+        bBody.innerHTML = '';
+        const now = today();
+
+        d.batches.forEach(b => {
+            const isExp = b.expire && b.expire < now;
+            const isDead = b.stok <= 0;
+            const tr = document.createElement('tr');
+            tr.className = isDead ? 'bg-slate-50/80 text-slate-400' : 'hover:bg-slate-50/60';
+
+            const statusColor = {
+                'RECEIVED': 'bg-emerald-50 text-emerald-600',
+                'NOT RECEIVED': 'bg-amber-50 text-amber-600',
+                'OTHER': 'bg-slate-100 text-slate-500'
+            }[b.status] || 'bg-slate-100 text-slate-400';
+
+            tr.innerHTML = `
+                <td class="px-4 py-2.5 font-mono font-medium">${b.batch}</td>
+                <td class="px-4 py-2.5 text-emerald-600 font-medium">${fmtD(b.mfg)}</td>
+                <td class="px-4 py-2.5 ${isExp ? 'text-red-500 font-semibold' : ''}">${fmtD(b.expire)}</td>
+                <td class="px-4 py-2.5"><span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${statusColor}">${b.status || '-'}</span></td>
+                <td class="px-4 py-2.5 text-right">${fmtN(b.penerimaan)}</td>
+                <td class="px-4 py-2.5 text-right">${fmtN(b.distribusi)}</td>
+                <td class="px-4 py-2.5 text-right font-bold ${isDead ? '' : 'text-slate-900'}">${fmtN(b.stok)}</td>`;
+            bBody.appendChild(tr);
+        });
+
+        // Riwayat per konsumen
+        const rBody = document.getElementById('det-riwayat-body');
+        rBody.innerHTML = '';
+        d.riwayat.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/60';
+            tr.innerHTML = `
+                <td class="px-4 py-2.5 font-medium text-slate-800">${r.konsumen}</td>
+                <td class="px-4 py-2.5 text-right ${r.masuk > 0 ? 'text-emerald-600 font-semibold' : 'text-slate-300'}">${r.masuk > 0 ? '+'+fmtN(r.masuk) : '-'}</td>
+                <td class="px-4 py-2.5 text-right ${r.keluar > 0 ? 'text-red-500 font-semibold' : 'text-slate-300'}">${r.keluar > 0 ? '-'+fmtN(r.keluar) : '-'}</td>
+                <td class="px-4 py-2.5 text-right font-bold text-slate-900">${fmtN(r.total)}</td>`;
+            rBody.appendChild(tr);
+        });
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function backToSearch() {
+        hide('product-detail');
+        show('search-box');
+        filterProducts();
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* TAB 2: PENGIRIMAN                          */
+    /* ═══════════════════════════════════════════ */
+
+    function fetchPengiriman() {
+        const s = document.getElementById('p-start').value;
+        const e = document.getElementById('p-end').value;
+        const konsumen = document.getElementById('p-konsumen').value;
+        const kota = document.getElementById('p-kota').value;
+        if(!s || !e) { err('Pilih rentang tanggal.'); return; }
+        err(null); hide('p-results'); hide('p-toggle-row'); show('dist-loading');
+        google.script.run
+            .withSuccessHandler(onPengiriman)
+            .withFailureHandler(ex => { hide('dist-loading'); err('Gagal: ' + ex.message); })
+            .handleRequest('getPengiriman', { startDate: s, endDate: e, konsumen: konsumen, kota: kota });
+    }
+
+    function onPengiriman(res) {
+        hide('dist-loading');
+        pRawData = res.results || [];
+        document.getElementById('p-summary').innerText =
+            res.count + ' transaksi  /  ' + fmtN(res.totalQty) + ' unit';
+        show('p-results'); show('p-toggle-row');
+        renderPengiriman();
+    }
+
+    function togglePMode() {
+        pSummaryMode = !pSummaryMode;
+        const toggle = document.getElementById('p-toggle');
+        const knob = toggle.querySelector('.toggle-knob');
+        if(pSummaryMode) {
+            toggle.classList.remove('bg-slate-200'); toggle.classList.add('bg-sky-600');
+            knob.style.transform = 'translateX(16px)';
+        } else {
+            toggle.classList.remove('bg-sky-600'); toggle.classList.add('bg-slate-200');
+            knob.style.transform = 'translateX(0)';
+        }
+        renderPengiriman();
+    }
+
+    function renderPengiriman() {
+        if(pSummaryMode) {
+            hide('p-table-detail'); show('p-table-summary');
+            renderPSummary();
+        } else {
+            show('p-table-detail'); hide('p-table-summary');
+            renderPDetail();
+        }
+    }
+
+    function renderPDetail() {
+        const tbody = document.getElementById('p-tbody-detail');
+        tbody.innerHTML = '';
+        pRawData.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/60';
+            tr.innerHTML = `
+                <td class="px-4 py-2.5 whitespace-nowrap text-slate-500">${fmtD(r.tanggal)}</td>
+                <td class="px-4 py-2.5 font-mono text-[10px] text-slate-500">${r.noDokumen || '-'}</td>
+                <td class="px-4 py-2.5 font-medium text-slate-800">${r.konsumen}</td>
+                <td class="px-4 py-2.5 text-slate-500">${r.kota}</td>
+                <td class="px-4 py-2.5 text-slate-700">${r.namaDagang}</td>
+                <td class="px-4 py-2.5 font-mono text-[10px]">${r.batch}</td>
+                <td class="px-4 py-2.5 text-right font-bold text-slate-900">${fmtN(r.qty)}</td>
+                <td class="px-4 py-2.5 text-slate-400 text-[10px]">${r.keterangan || '-'}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderPSummary() {
+        const groups = {};
+        pRawData.forEach(r => {
+            const key = r.namaDagang + '|' + r.batch + '|' + r.tanggal;
+            if(!groups[key]) {
+                groups[key] = { namaDagang: r.namaDagang, batch: r.batch, mfg: r.mfg, expire: r.expire, qty: 0 };
+            }
+            groups[key].qty += r.qty;
+        });
+        const rows = Object.values(groups).sort((a,b) => a.namaDagang.localeCompare(b.namaDagang));
+        const tbody = document.getElementById('p-tbody-summary');
+        tbody.innerHTML = '';
+        rows.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/60';
+            tr.innerHTML = `
+                <td class="px-4 py-2.5 font-medium text-slate-800">${r.namaDagang}</td>
+                <td class="px-4 py-2.5 font-mono text-[10px]">${r.batch}</td>
+                <td class="px-4 py-2.5">
+                    <div class="text-[10px] text-emerald-600 font-medium">${fmtD(r.mfg)}</div>
+                    <div class="text-[10px] text-red-500 font-medium">${fmtD(r.expire)}</div>
+                </td>
+                <td class="px-4 py-2.5 text-right font-bold text-slate-900">${fmtN(r.qty)}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* TAB 2: CYCLE COUNT                         */
+    /* ═══════════════════════════════════════════ */
+
+    function fetchCycleCount() {
+        const d = document.getElementById('c-date').value;
+        if(!d) { err('Pilih tanggal opname.'); return; }
+        err(null); hide('c-results'); show('dist-loading');
+        google.script.run
+            .withSuccessHandler(onCycle)
+            .withFailureHandler(ex => { hide('dist-loading'); err('Gagal: ' + ex.message); })
+            .handleRequest('getCycleCount', { tanggal: d });
+    }
+
+    function onCycle(res) {
+        hide('dist-loading'); show('c-results');
+        document.getElementById('c-pen').innerText = fmtN(res.summary.totalPenerimaan);
+        document.getElementById('c-dist').innerText = fmtN(res.summary.totalDistribusi);
+        document.getElementById('c-stok').innerText = fmtN(res.summary.totalStok);
+
+        const tbody = document.getElementById('c-tbody');
+        tbody.innerHTML = '';
+        res.results.forEach(r => {
+            const isDead = r.stokAkhir <= 0;
+            const tr = document.createElement('tr');
+            tr.className = isDead ? 'bg-slate-50/80 text-slate-400' : 'hover:bg-slate-50/60';
+            tr.innerHTML = `
+                <td class="px-4 py-2.5 font-medium ${isDead ? '' : 'text-slate-800'}">${r.namaDagang}</td>
+                <td class="px-4 py-2.5 font-mono text-[10px]">${r.batch}</td>
+                <td class="px-4 py-2.5">
+                    <div class="text-[10px] text-emerald-600 font-medium">${fmtD(r.mfg)}</div>
+                    <div class="text-[10px] text-red-500 font-medium">${fmtD(r.expire)}</div>
+                </td>
+                <td class="px-4 py-2.5 text-right">${fmtN(r.penHariIni)}</td>
+                <td class="px-4 py-2.5 text-right">${fmtN(r.distHariIni)}</td>
+                <td class="px-4 py-2.5 text-right font-bold ${isDead ? '' : 'text-slate-900'}">${fmtN(r.stokAkhir)}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* TAB 2: BATCH RECORD                        */
+    /* ═══════════════════════════════════════════ */
+
+    let brCurrentDetail = null; // store for export
+
+    function searchBatchRecord() {
+        const q = document.getElementById('br-search').value.trim();
+        if(!q) return;
+        err(null);
+        hide('br-cards'); hide('br-empty'); hide('br-detail');
+        show('br-loading');
+        google.script.run
+            .withSuccessHandler(onBatchSearch)
+            .withFailureHandler(e => { hide('br-loading'); err('Gagal: ' + e.message); })
+            .handleRequest('searchBatch', { query: q });
+    }
+
+    function onBatchSearch(data) {
+        hide('br-loading');
+        const list = document.getElementById('br-card-list');
+        list.innerHTML = '';
+
+        if(!data.results || data.results.length === 0) { show('br-empty'); return; }
+
+        show('br-cards');
+        document.getElementById('br-card-count').innerText = data.results.length + ' batch';
+
+        data.results.forEach(b => {
+            const card = document.createElement('div');
+            const stokClass = b.stok > 0 ? 'text-emerald-600' : 'text-red-500';
+            card.className = 'bg-white p-4 border border-slate-200 rounded-xl cursor-pointer card-hover group';
+            card.onclick = () => loadBatchDetail(b.kodeBarang, b.batch);
+            card.innerHTML = `
+                <h4 class="text-xs font-bold text-slate-900 group-hover:text-sky-600 transition-colors leading-snug truncate">${b.namaDagang}</h4>
+                <div class="flex items-center gap-2 mt-2">
+                    <span class="font-mono text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">${b.batch}</span>
+                    <span class="text-[10px] text-slate-400">${fmtD(b.expire)}</span>
+                </div>
+                <div class="mt-3 flex items-baseline justify-between">
+                    <span class="text-[9px] font-bold text-slate-400 uppercase">Stok</span>
+                    <span class="text-sm font-extrabold ${stokClass}">${fmtN(b.stok)}</span>
+                </div>`;
+            list.appendChild(card);
+        });
+    }
+
+    function loadBatchDetail(kode, batch) {
+        err(null);
+        hide('br-cards'); hide('br-empty');
+        show('br-loading');
+        google.script.run
+            .withSuccessHandler(onBatchDetail)
+            .withFailureHandler(e => { hide('br-loading'); err('Gagal: ' + e.message); })
+            .handleRequest('getBatchDetail', { kodeBarang: kode, batch: batch });
+    }
+
+    function onBatchDetail(d) {
+        hide('br-loading');
+        show('br-detail');
+        brCurrentDetail = d;
+
+        document.getElementById('br-det-nama').innerText = d.namaDagang || d.kodeBarang;
+        document.getElementById('br-det-batch').innerText = d.batch;
+        document.getElementById('br-det-mfg').innerText = fmtD(d.mfg);
+        document.getElementById('br-det-expire').innerText = fmtD(d.expire);
+
+        const statusEl = document.getElementById('br-det-status');
+        statusEl.innerText = d.status || '-';
+        statusEl.className = 'text-xs font-semibold ' + ({
+            'RECEIVED': 'text-emerald-600',
+            'NOT RECEIVED': 'text-amber-600',
+            'OTHER': 'text-slate-500'
+        }[d.status] || 'text-slate-400');
+
+        const stokEl = document.getElementById('br-det-stok');
+        stokEl.innerText = fmtN(d.stokAkhir);
+        stokEl.className = d.stokAkhir > 0 ? 'text-sm font-extrabold text-sky-600' : 'text-sm font-extrabold text-red-500';
+
+        const tbody = document.getElementById('br-tbody');
+        tbody.innerHTML = '';
+
+        d.rows.forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/60';
+            tr.innerHTML = `
+                <td class="px-4 py-2.5 whitespace-nowrap text-slate-500">${fmtD(r.tanggal)}</td>
+                <td class="px-4 py-2.5 font-medium text-slate-800">${r.konsumen}</td>
+                <td class="px-4 py-2.5 text-slate-500">${r.kota}</td>
+                <td class="px-4 py-2.5 text-right ${r.masuk > 0 ? 'text-emerald-600 font-semibold' : 'text-slate-300'}">${r.masuk > 0 ? '+'+fmtN(r.masuk) : '-'}</td>
+                <td class="px-4 py-2.5 text-right ${r.keluar > 0 ? 'text-red-500 font-semibold' : 'text-slate-300'}">${r.keluar > 0 ? '-'+fmtN(r.keluar) : '-'}</td>
+                <td class="px-4 py-2.5 text-right font-bold text-slate-900">${fmtN(r.stok)}</td>`;
+            tbody.appendChild(tr);
+        });
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function backToBatchCards() {
+        hide('br-detail');
+        brCurrentDetail = null;
+        if(document.getElementById('br-card-list').children.length > 0) show('br-cards');
+    }
+
+    function exportBatch() {
+        if(!brCurrentDetail) return;
+        const d = brCurrentDetail;
+        const btn = document.getElementById('br-export-btn');
+        btn.disabled = true;
+        btn.innerText = 'Exporting...';
+
+        google.script.run
+            .withSuccessHandler(res => {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Export';
+                if(res.downloadUrl) window.open(res.downloadUrl, '_blank');
+            })
+            .withFailureHandler(e => {
+                btn.disabled = false;
+                btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Export';
+                err('Export gagal: ' + e.message);
+            })
+            .handleRequest('exportBatchRecord', { kodeBarang: d.kodeBarang, batch: d.batch, namaDagang: d.namaDagang });
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* EMBALAGE: DASHBOARD                        */
+    /* ═══════════════════════════════════════════ */
+
+    let embDashLoaded = false;
+    let embInputLoaded = false;
+    let embHistLoaded = false;
+    let embOutLoaded = false;
+    let embItemList = [];
+    let embHistPage = 1;
+    let embOutPage = 1;
+
+    function loadEmbalageDashboard() {
+        show('emb-dash-loading'); hide('emb-dash-content');
+        google.script.run
+            .withSuccessHandler(onEmbDashboard)
+            .withFailureHandler(e => { hide('emb-dash-loading'); err('Gagal: ' + e.message); })
+            .handleRequest('getEmbalageDashboard', {});
+    }
+
+    function onEmbDashboard(res) {
+        hide('emb-dash-loading'); show('emb-dash-content');
+        embDashLoaded = true;
+        const items = res.items || [];
+
+        let belowSafety = 0, needReorder = 0;
+        items.forEach(i => {
+            if(i.safetyStock > 0 && i.stok < i.safetyStock) belowSafety++;
+            if(i.reorderPoint > 0 && i.stok <= i.reorderPoint) needReorder++;
+        });
+
+        document.getElementById('emb-total-items').innerText = items.length;
+        document.getElementById('emb-below-safety').innerText = belowSafety;
+        document.getElementById('emb-need-reorder').innerText = needReorder;
+
+        // Horizontal bar chart
+        const chart = document.getElementById('emb-chart');
+        chart.innerHTML = '';
+        const maxVal = Math.max(...items.map(i => Math.max(i.stok, i.safetyStock, i.reorderPoint, 1)));
+
+        items.forEach(i => {
+            const pct = Math.max(0, (i.stok / maxVal) * 100);
+            const sPct = i.safetyStock > 0 ? Math.min(100, (i.safetyStock / maxVal) * 100) : 0;
+            const rPct = i.reorderPoint > 0 ? Math.min(100, (i.reorderPoint / maxVal) * 100) : 0;
+
+            let barColor = 'bg-sky-500';
+            let statusTip = 'OK';
+            if(i.safetyStock > 0 && i.stok < i.safetyStock) { barColor = 'bg-red-500'; statusTip = 'LOW — di bawah safety stock'; }
+            else if(i.reorderPoint > 0 && i.stok <= i.reorderPoint) { barColor = 'bg-amber-500'; statusTip = 'REORDER — perlu restock'; }
+
+            const row = document.createElement('div');
+            row.className = 'group relative';
+            row.innerHTML = `
+                <div class="flex items-center gap-2">
+                    <span class="text-[9px] font-medium text-slate-600 w-24 sm:w-32 truncate shrink-0">${i.nama}</span>
+                    <div class="flex-1 relative h-5 bg-slate-100 rounded overflow-hidden">
+                        <div class="${barColor} h-full rounded transition-all" style="width:${pct}%"></div>
+                        ${sPct > 0 ? '<div class="absolute top-0 bottom-0 border-l-2 border-dashed border-red-400" style="left:'+sPct+'%"></div>' : ''}
+                        ${rPct > 0 ? '<div class="absolute top-0 bottom-0 border-l-2 border-dashed border-amber-400" style="left:'+rPct+'%"></div>' : ''}
+                    </div>
+                    <span class="text-[9px] font-bold text-slate-700 w-10 text-right shrink-0">${fmtN(i.stok)}</span>
+                </div>
+                <div class="hidden group-hover:block absolute left-28 sm:left-36 -top-8 z-20 bg-slate-900 text-white text-[9px] px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                    ${statusTip} · Stok: ${fmtN(i.stok)} · Safety: ${i.safetyStock > 0 ? fmtN(i.safetyStock) : '-'} · ROP: ${i.reorderPoint > 0 ? fmtN(i.reorderPoint) : '-'}
+                </div>`;
+            chart.appendChild(row);
+        });
+
+        // Legend
+        const legend = document.createElement('div');
+        legend.className = 'flex flex-wrap gap-3 mt-3 pt-3 border-t border-slate-100';
+        legend.innerHTML = `
+            <span class="flex items-center gap-1 text-[9px] text-slate-500"><span class="w-2 h-2 bg-sky-500 rounded-sm"></span>OK</span>
+            <span class="flex items-center gap-1 text-[9px] text-slate-500"><span class="w-2 h-2 bg-amber-500 rounded-sm"></span>Reorder</span>
+            <span class="flex items-center gap-1 text-[9px] text-slate-500"><span class="w-2 h-2 bg-red-500 rounded-sm"></span>Low</span>
+            <span class="flex items-center gap-1 text-[9px] text-slate-500"><span class="w-3 border-t-2 border-dashed border-red-400"></span>Safety Stock</span>
+            <span class="flex items-center gap-1 text-[9px] text-slate-500"><span class="w-3 border-t-2 border-dashed border-amber-400"></span>Reorder Point</span>`;
+        chart.appendChild(legend);
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* EMBALAGE: INPUT                            */
+    /* ═══════════════════════════════════════════ */
+
+    function loadEmbalageInput() {
+        show('emb-in-loading');
+        // Load item list for dropdown + history
+        google.script.run
+            .withSuccessHandler(res => {
+                embItemList = res.items || [];
+                const sel = document.getElementById('emb-in-barang');
+                sel.innerHTML = '<option value="">Pilih barang...</option>';
+                embItemList.forEach(item => {
+                    const opt = document.createElement('option');
+                    opt.value = JSON.stringify({ kode: item.kode, nama: item.nama, satuan: item.satuan });
+                    opt.textContent = item.nama + (item.kode ? ' [' + item.kode + ']' : '');
+                    sel.appendChild(opt);
+                });
+                document.getElementById('emb-in-tgl').value = today();
+                loadPenerimaanHistory();
+            })
+            .withFailureHandler(e => { hide('emb-in-loading'); err('Gagal: ' + e.message); })
+            .handleRequest('getEmbalageList', {});
+    }
+
+    function onEmbBarangChange() {
+        const val = document.getElementById('emb-in-barang').value;
+        if(!val) { document.getElementById('emb-in-satuan').value = ''; return; }
+        const item = JSON.parse(val);
+        document.getElementById('emb-in-satuan').value = item.satuan;
+    }
+
+    function loadPenerimaanHistory() {
+        show('emb-in-loading');
+        google.script.run
+            .withSuccessHandler(res => {
+                hide('emb-in-loading');
+                embInputLoaded = true;
+                const tbody = document.getElementById('emb-in-tbody');
+                tbody.innerHTML = '';
+                (res.results || []).reverse().forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50/60';
+                    tr.innerHTML = `
+                        <td class="px-4 py-2.5 text-slate-400">${r.no}</td>
+                        <td class="px-4 py-2.5 text-slate-500">${fmtD(r.tanggal)}</td>
+                        <td class="px-4 py-2.5 font-mono text-[10px] text-slate-500">${r.nomorBon || '-'}</td>
+                        <td class="px-4 py-2.5 font-medium text-slate-800">${r.nama}</td>
+                        <td class="px-4 py-2.5 text-right font-bold text-slate-900">${fmtN(r.jumlah)}</td>
+                        <td class="px-4 py-2.5 text-slate-500">${r.satuan}</td>
+                        <td class="px-4 py-2.5 text-slate-400 text-[10px]">${r.keterangan || '-'}</td>`;
+                    tbody.appendChild(tr);
+                });
+            })
+            .withFailureHandler(e => { hide('emb-in-loading'); err('Gagal: ' + e.message); })
+            .handleRequest('getEmbalagePenerimaan', {});
+    }
+
+    function submitEmbalagePenerimaan() {
+        const barangVal = document.getElementById('emb-in-barang').value;
+        const tgl = document.getElementById('emb-in-tgl').value;
+        const jumlah = document.getElementById('emb-in-jumlah').value;
+
+        if(!barangVal || !tgl || !jumlah) { err('Lengkapi tanggal, barang, dan jumlah.'); return; }
+
+        const item = JSON.parse(barangVal);
+        const btn = document.getElementById('emb-in-submit');
+        btn.disabled = true; btn.innerText = 'Menyimpan...';
+
+        google.script.run
+            .withSuccessHandler(res => {
+                btn.disabled = false; btn.innerText = 'Simpan Penerimaan';
+                if(res.success) {
+                    document.getElementById('emb-in-jumlah').value = '';
+                    document.getElementById('emb-in-bon').value = '';
+                    document.getElementById('emb-in-ket').value = '';
+                    document.getElementById('emb-in-barang').value = '';
+                    document.getElementById('emb-in-satuan').value = '';
+                    embDashLoaded = false; // force refresh dashboard
+                    embOutLoaded = false; // force refresh output
+                    loadPenerimaanHistory();
+                }
+            })
+            .withFailureHandler(e => { btn.disabled = false; btn.innerText = 'Simpan Penerimaan'; err('Gagal: ' + e.message); })
+            .handleRequest('addEmbalagePenerimaan', {
+                tanggal: tgl,
+                nomorBon: document.getElementById('emb-in-bon').value,
+                kode: item.kode,
+                nama: item.nama,
+                jumlah: jumlah,
+                satuan: item.satuan,
+                keterangan: document.getElementById('emb-in-ket').value
+            });
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* EMBALAGE: OUTPUT (Pengeluaran history)      */
+    /* ═══════════════════════════════════════════ */
+
+    function loadPengeluaranHistory(page) {
+        embOutPage = page || 1;
+        show('emb-out-loading'); hide('emb-out-content');
+        google.script.run
+            .withSuccessHandler(onPengeluaran)
+            .withFailureHandler(e => { hide('emb-out-loading'); err('Gagal: ' + e.message); })
+            .handleRequest('getEmbalagePengeluaran', { page: embOutPage, pageSize: 20 });
+    }
+
+    function onPengeluaran(res) {
+        hide('emb-out-loading'); show('emb-out-content');
+        embOutLoaded = true;
+
+        document.getElementById('emb-out-page-info').innerText = 'Hal ' + res.page + '/' + res.totalPages;
+        document.getElementById('emb-out-prev').disabled = res.page <= 1;
+        document.getElementById('emb-out-next').disabled = res.page >= res.totalPages;
+
+        const tbody = document.getElementById('emb-out-tbody');
+        tbody.innerHTML = '';
+        (res.results || []).forEach(r => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-slate-50/60';
+            tr.innerHTML = `
+                <td class="px-3 py-2 text-slate-400">${r.no}</td>
+                <td class="px-3 py-2 text-slate-500">${fmtD(r.tanggal)}</td>
+                <td class="px-3 py-2 font-mono text-[9px] text-slate-500">${r.noPacking || '-'}</td>
+                <td class="px-3 py-2 font-medium text-slate-800">${r.nama}</td>
+                <td class="px-3 py-2 text-right font-bold text-slate-900">${fmtN(r.jumlah)}</td>
+                <td class="px-3 py-2 text-slate-500">${r.satuan}</td>
+                <td class="px-3 py-2 text-slate-400 text-[9px]">${r.keterangan || '-'}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* EMBALAGE: HISTORY (Distribusi)              */
+    /* ═══════════════════════════════════════════ */
+
+    function loadDistribusiHistory(page) {
+        embHistPage = page || 1;
+        show('emb-hist-loading'); hide('emb-hist-list'); hide('emb-hist-detail');
+
+        google.script.run
+            .withSuccessHandler(onDistribusiHistory)
+            .withFailureHandler(e => { hide('emb-hist-loading'); err('Gagal: ' + e.message); })
+            .handleRequest('getDistribusiHistory', { page: embHistPage, pageSize: 15 });
+    }
+
+    function onDistribusiHistory(res) {
+        hide('emb-hist-loading'); show('emb-hist-list');
+        embHistLoaded = true;
+
+        document.getElementById('emb-hist-count').innerText = res.total + ' pengiriman';
+        document.getElementById('emb-page-info').innerText = 'Hal ' + res.page + '/' + res.totalPages;
+        document.getElementById('emb-prev').disabled = res.page <= 1;
+        document.getElementById('emb-next').disabled = res.page >= res.totalPages;
+
+        const container = document.getElementById('emb-hist-cards');
+        container.innerHTML = '';
+
+        (res.groups || []).forEach(g => {
+            const card = document.createElement('div');
+            card.className = 'bg-white p-4 border border-slate-200 rounded-xl cursor-pointer card-hover group';
+            card.onclick = () => loadDistribusiDetail(g.tanggal, g.tujuan, g);
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start gap-2">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-xs font-bold text-slate-900 group-hover:text-sky-600 transition-colors truncate">${g.tujuan}</h4>
+                        <div class="flex items-center gap-2 mt-1.5">
+                            <span class="text-[10px] text-slate-400">${fmtD(g.tanggal)}</span>
+                            ${g.noDokumen ? '<span class="font-mono text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">'+g.noDokumen+'</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="text-right shrink-0">
+                        ${g.berat ? '<p class="text-xs font-bold text-slate-900">'+Number(g.berat).toFixed(2)+' kg</p>' : ''}
+                        ${g.forwarder ? '<p class="text-[9px] font-bold text-sky-500 uppercase mt-0.5">'+g.forwarder+'</p>' : ''}
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+                    <span>${g.itemCount} produk</span>
+                    <span>${fmtN(g.totalQty)} unit</span>
+                </div>`;
+            container.appendChild(card);
+        });
+    }
+
+    function loadDistribusiDetail(tanggal, tujuan, groupInfo) {
+        hide('emb-hist-list'); show('emb-hist-loading');
+
+        google.script.run
+            .withSuccessHandler(res => {
+                hide('emb-hist-loading'); show('emb-hist-detail');
+                document.getElementById('emb-hist-det-tujuan').innerText = tujuan;
+                document.getElementById('emb-hist-det-tgl').innerText = fmtD(tanggal);
+                document.getElementById('emb-hist-det-dok').innerText = groupInfo.noDokumen || '-';
+                document.getElementById('emb-hist-det-berat').innerText = groupInfo.berat ? Number(groupInfo.berat).toFixed(2) + ' kg' : '-';
+                document.getElementById('emb-hist-det-fwd').innerText = groupInfo.forwarder || '-';
+
+                const tbody = document.getElementById('emb-hist-det-tbody');
+                tbody.innerHTML = '';
+                (res.rows || []).forEach(r => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50/60';
+                    tr.innerHTML = `
+                        <td class="px-4 py-2.5 font-medium text-slate-800">${r.produk}</td>
+                        <td class="px-4 py-2.5 font-mono text-[10px]">${r.batch}</td>
+                        <td class="px-4 py-2.5 text-slate-500">${fmtD(r.expire)}</td>
+                        <td class="px-4 py-2.5 text-right font-bold text-slate-900">${fmtN(r.distribusi)}</td>
+                        <td class="px-4 py-2.5 text-slate-400 text-[10px]">${r.keterangan || '-'}</td>`;
+                    tbody.appendChild(tr);
+                });
+            })
+            .withFailureHandler(e => { hide('emb-hist-loading'); show('emb-hist-list'); err('Gagal: ' + e.message); })
+            .handleRequest('getDistribusiDetail', { tanggal: tanggal, tujuan: tujuan });
+    }
+
+    function backToHistList() {
+        hide('emb-hist-detail'); show('emb-hist-list');
+    }
+
+    /* ═══════════════════════════════════════════ */
+    /* INIT                                       */
+    /* ═══════════════════════════════════════════ */
+    window.onload = function() {
+        const t = today();
+        ['p-start','p-end','c-date'].forEach(id => document.getElementById(id).value = t);
+        loadAllProducts();
+        lucide.createIcons();
+    };
+    </script>
+</body>
+</html>
