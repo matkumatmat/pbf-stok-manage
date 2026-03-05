@@ -56,19 +56,7 @@ var MD_KET       = 17;
 // ═══════════════════════════════════════════════════════════
 
 function doGet() {
-  // Check session
-  var session = checkSession();
-
-  if (!session.authenticated) {
-    // Not authenticated - show login page
-    return HtmlService
-      .createHtmlOutputFromFile('lib/Auth/Login')
-      .setTitle('Login - Stok PBF')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  }
-
-  // Authenticated - show main app
+  // Always serve main app (auth handled client-side via localStorage)
   return HtmlService
     .createHtmlOutputFromFile('index')
     .setTitle('Stok PBF')
@@ -81,18 +69,10 @@ function doGet() {
 // ═══════════════════════════════════════════════════════════
 
 function handleRequest(action, params) {
-  // Auth actions (bypass session check)
+  // Auth action (client-side session via localStorage)
   if (action === 'login') return authenticateUser(params.username, params.password);
-  if (action === 'checkSession') return checkSession();
-  if (action === 'logout') return logout();
 
-  // Session validation for all other actions
-  var session = checkSession();
-  if (!session.authenticated) {
-    return { error: 'Session expired. Please login again.', requiresAuth: true };
-  }
-
-  // Existing actions
+  // All other actions (no server-side session validation)
   switch (action) {
     case 'searchProduct':      return searchProduct(params.query);
     case 'getProductList':     return getProductList();

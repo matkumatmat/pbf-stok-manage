@@ -53,9 +53,72 @@
             50% { transform: rotate(45deg) rotateX(-385deg) rotateY(25deg); }
             100% { transform: rotate(45deg) rotateX(-385deg) rotateY(385deg); }
         }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.2s ease-out;
+        }
     </style>
 </head>
 <body class="bg-[#f8fafb] text-slate-700 min-h-screen text-[13px]">
+
+    <!-- Login Modal Overlay -->
+    <div id="login-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 animate-fadeIn">
+            <!-- Logo & Title -->
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-gradient-to-br from-sky-500 to-sky-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <div data-lucide="package" class="w-8 h-8 text-white"></div>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Stok PBF</h1>
+                <p class="text-slate-500 text-sm mt-1">Silakan login untuk melanjutkan</p>
+            </div>
+
+            <!-- Error Alert -->
+            <div id="login-error" class="hidden mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-r-lg">
+                <p id="login-error-msg" class="text-red-700 text-xs font-medium"></p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Username</label>
+                    <input
+                        type="text"
+                        id="login-username"
+                        required
+                        autocomplete="username"
+                        class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                        placeholder="Masukkan username">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-2 uppercase tracking-wider">Password</label>
+                    <input
+                        type="password"
+                        id="login-password"
+                        required
+                        autocomplete="current-password"
+                        class="w-full px-4 py-3 border border-slate-300 rounded-lg text-sm text-slate-900 outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent transition-all"
+                        placeholder="Masukkan password">
+                </div>
+
+                <button
+                    type="submit"
+                    id="login-btn"
+                    class="w-full mt-6 py-3.5 bg-gradient-to-r from-sky-600 to-sky-700 text-white text-sm font-bold rounded-lg hover:from-sky-700 hover:to-sky-800 active:scale-[0.98] transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span id="login-btn-text">Login</span>
+                    <span id="login-btn-loading" class="hidden">Memproses...</span>
+                </button>
+            </form>
+
+            <div class="mt-6 pt-4 border-t border-slate-200 text-center">
+                <p class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Sistem Manajemen Stok PBF</p>
+            </div>
+        </div>
+    </div>
 
     <!-- Top Header (brand only) -->
     <header class="fixed top-0 inset-x-0 nav-glass border-b border-slate-200/60 z-50">
@@ -1502,38 +1565,113 @@
     }
 
     /* ═══════════════════════════════════════════ */
-    /* AUTH                                       */
+    /* AUTH (localStorage-based)                  */
     /* ═══════════════════════════════════════════ */
+    function checkLocalSession() {
+        const session = localStorage.getItem('pbf_session');
+        if (session) {
+            try {
+                const user = JSON.parse(session);
+                // Display username in header
+                const userNameEl = document.getElementById('user-name');
+                if (userNameEl && user.username) {
+                    userNameEl.textContent = user.username;
+                }
+                return true;
+            } catch (e) {
+                localStorage.removeItem('pbf_session');
+                return false;
+            }
+        }
+        return false;
+    }
+
+    function showLoginModal() {
+        document.getElementById('login-modal').classList.remove('hidden');
+        setTimeout(() => {
+            document.getElementById('login-username').focus();
+        }, 100);
+    }
+
+    function hideLoginModal() {
+        document.getElementById('login-modal').classList.add('hidden');
+    }
+
+    function showLoginError(msg) {
+        const alert = document.getElementById('login-error');
+        const msgEl = document.getElementById('login-error-msg');
+        msgEl.textContent = msg;
+        alert.classList.remove('hidden');
+        setTimeout(() => alert.classList.add('hidden'), 5000);
+    }
+
+    function setLoginLoading(loading) {
+        const btn = document.getElementById('login-btn');
+        const btnText = document.getElementById('login-btn-text');
+        const btnLoading = document.getElementById('login-btn-loading');
+
+        btn.disabled = loading;
+        if (loading) {
+            btnText.classList.add('hidden');
+            btnLoading.classList.remove('hidden');
+        } else {
+            btnText.classList.remove('hidden');
+            btnLoading.classList.add('hidden');
+        }
+    }
+
+    function handleLogin(event) {
+        event.preventDefault();
+
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+
+        if (!username || !password) {
+            showLoginError('Username dan password harus diisi');
+            return;
+        }
+
+        setLoginLoading(true);
+
+        google.script.run
+            .withSuccessHandler(res => {
+                setLoginLoading(false);
+
+                if (res.success) {
+                    // Save to localStorage
+                    localStorage.setItem('pbf_session', JSON.stringify({
+                        username: res.username,
+                        role: res.role
+                    }));
+
+                    // Update UI
+                    hideLoginModal();
+                    const userNameEl = document.getElementById('user-name');
+                    if (userNameEl) {
+                        userNameEl.textContent = res.username;
+                    }
+
+                    // Clear form
+                    document.getElementById('login-form').reset();
+                } else {
+                    showLoginError(res.error || 'Login gagal');
+                }
+            })
+            .withFailureHandler(e => {
+                setLoginLoading(false);
+                showLoginError('Terjadi kesalahan: ' + e.message);
+            })
+            .handleRequest('login', { username: username, password: password });
+    }
+
     function handleLogout() {
         if (!confirm('Yakin ingin logout?')) return;
 
-        google.script.run
-            .withSuccessHandler(() => {
-                window.location.reload(); // Will redirect to login page
-            })
-            .withFailureHandler(e => {
-                err('Gagal logout: ' + e.message);
-            })
-            .handleRequest('logout', {});
-    }
+        // Clear localStorage
+        localStorage.removeItem('pbf_session');
 
-    function verifySession() {
-        google.script.run
-            .withSuccessHandler(res => {
-                if (!res.authenticated) {
-                    window.location.reload(); // Session expired, redirect to login
-                } else {
-                    // Display username in header
-                    const userNameEl = document.getElementById('user-name');
-                    if (userNameEl && res.username) {
-                        userNameEl.textContent = res.username;
-                    }
-                }
-            })
-            .withFailureHandler(() => {
-                window.location.reload(); // Error checking session, reload to login
-            })
-            .handleRequest('checkSession', {});
+        // Reload page (will show login modal)
+        window.location.reload();
     }
 
     /* ═══════════════════════════════════════════ */
@@ -1542,8 +1680,16 @@
     window.onload = function() {
         const t = today();
         ['p-start','p-end','c-date'].forEach(id => document.getElementById(id).value = t);
-        verifySession(); // Verify session is still valid
-        loadAllProducts();
+
+        // Check localStorage session
+        if (!checkLocalSession()) {
+            // No session - show login modal
+            showLoginModal();
+        } else {
+            // Has session - load app data
+            loadAllProducts();
+        }
+
         lucide.createIcons();
     };
     </script>
