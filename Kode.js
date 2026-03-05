@@ -76,7 +76,6 @@ function handleRequest(action, params) {
     case 'getDistributorList': return getDistributorList();
     case 'searchBatch':        return searchBatch(params.query);
     case 'getBatchDetail':     return getBatchDetail(params.kodeBarang, params.batch);
-    case 'exportBatchRecord':  return exportBatchRecord(params.kodeBarang, params.batch, params.namaDagang);
     // Embalage
     case 'getEmbalageList':      return getEmbalageList();
     case 'getEmbalagePenerimaan': return getEmbalagePenerimaan();
@@ -617,75 +616,6 @@ function getBatchDetail(kodeBarang, batch) {
 /**
  * Export batch record to a new Google Sheet (A4 formatted), return URL
  */
-function exportBatchRecord(kodeBarang, batch, namaDagang) {
-  var detail = getBatchDetail(kodeBarang, batch);
-  if (detail.error) return detail;
-
-  var title = 'Batch Record - ' + (namaDagang || kodeBarang) + ' [' + batch + ']';
-  var newSS = SpreadsheetApp.create(title);
-  var sheet = newSS.getActiveSheet();
-  sheet.setName('Batch Record');
-
-  // Allow anyone with link to view (so users don't need to request access)
-  DriveApp.getFileById(newSS.getId()).setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-
-  // Header info
-  sheet.getRange('A1').setValue('BATCH RECORD').setFontWeight('bold').setFontSize(14);
-  sheet.getRange('A3').setValue('Produk:').setFontWeight('bold');
-  sheet.getRange('B3').setValue(detail.namaDagang);
-  sheet.getRange('A4').setValue('Kode:').setFontWeight('bold');
-  sheet.getRange('B4').setValue(kodeBarang);
-  sheet.getRange('A5').setValue('Batch:').setFontWeight('bold');
-  sheet.getRange('B5').setValue(batch);
-  sheet.getRange('C3').setValue('MFG:').setFontWeight('bold');
-  sheet.getRange('D3').setValue(detail.mfg);
-  sheet.getRange('C4').setValue('Expire:').setFontWeight('bold');
-  sheet.getRange('D4').setValue(detail.expire);
-  sheet.getRange('C5').setValue('Status:').setFontWeight('bold');
-  sheet.getRange('D5').setValue(detail.status);
-  sheet.getRange('E3').setValue('Stok Akhir:').setFontWeight('bold');
-  sheet.getRange('F3').setValue(detail.stokAkhir).setFontWeight('bold').setFontSize(12);
-
-  // Table header row
-  var headerRow = 7;
-  var headers = ['Tanggal', 'Konsumen', 'Kota', 'Masuk', 'Keluar', 'Stok'];
-  var headerRange = sheet.getRange(headerRow, 1, 1, 6);
-  headerRange.setValues([headers]);
-  headerRange.setFontWeight('bold');
-  headerRange.setBackground('#f1f5f9');
-  headerRange.setBorder(true, true, true, true, true, true);
-
-  // Data rows
-  if (detail.rows.length > 0) {
-    var dataRows = detail.rows.map(function(r) {
-      return [r.tanggal, r.konsumen, r.kota, r.masuk, r.keluar, r.stok];
-    });
-    var dataRange = sheet.getRange(headerRow + 1, 1, dataRows.length, 6);
-    dataRange.setValues(dataRows);
-    dataRange.setBorder(true, true, true, true, true, true);
-
-    // Number format for Masuk/Keluar/Stok columns
-    sheet.getRange(headerRow + 1, 4, dataRows.length, 3).setNumberFormat('#,##0');
-  }
-
-  // Column widths for A4
-  sheet.setColumnWidth(1, 100); // Tanggal
-  sheet.setColumnWidth(2, 200); // Konsumen
-  sheet.setColumnWidth(3, 120); // Kota
-  sheet.setColumnWidth(4, 80);  // Masuk
-  sheet.setColumnWidth(5, 80);  // Keluar
-  sheet.setColumnWidth(6, 80);  // Stok
-
-  // Auto-fit won't exceed A4 width (~660px for 6 cols)
-
-  var fileId = newSS.getId();
-  return {
-    url: newSS.getUrl(),
-    downloadUrl: 'https://docs.google.com/spreadsheets/d/' + fileId + '/export?format=xlsx',
-    title: title
-  };
-}
-
 // ═══════════════════════════════════════════════════════════
 // EMBALAGE — Item List (from EMBALAGE sheet)
 // ═══════════════════════════════════════════════════════════

@@ -6,6 +6,7 @@
     <title>Stok PBF</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', system-ui, -apple-system, sans-serif; -webkit-font-smoothing: antialiased; }
@@ -1161,22 +1162,36 @@
     function exportBatch() {
         if(!brCurrentDetail) return;
         const d = brCurrentDetail;
-        const btn = document.getElementById('br-export-btn');
-        btn.disabled = true;
-        btn.innerText = 'Exporting...';
 
-        google.script.run
-            .withSuccessHandler(res => {
-                btn.disabled = false;
-                btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Export';
-                if(res.downloadUrl) window.open(res.downloadUrl, '_blank');
-            })
-            .withFailureHandler(e => {
-                btn.disabled = false;
-                btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg> Export';
-                err('Export gagal: ' + e.message);
-            })
-            .handleRequest('exportBatchRecord', { kodeBarang: d.kodeBarang, batch: d.batch, namaDagang: d.namaDagang });
+        // Build worksheet data
+        const wsData = [
+            ['BATCH RECORD'],
+            [],
+            ['Produk:', d.namaDagang, '', 'MFG:', fmtD(d.mfg), '', 'Stok Akhir:', d.stokAkhir],
+            ['Kode:', d.kodeBarang, '', 'Expire:', fmtD(d.expire)],
+            ['Batch:', d.batch, '', 'Status:', d.status],
+            [],
+            ['Tanggal', 'Konsumen', 'Kota', 'Masuk', 'Keluar', 'Stok']
+        ];
+        d.rows.forEach(r => {
+            wsData.push([fmtD(r.tanggal), r.konsumen, r.kota, r.masuk, r.keluar, r.stok]);
+        });
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        // Column widths
+        ws['!cols'] = [
+            {wch:12}, {wch:28}, {wch:16}, {wch:10}, {wch:10}, {wch:10}, {wch:12}, {wch:10}
+        ];
+
+        // Bold title
+        if(ws['A1']) ws['A1'].s = { font: { bold: true, sz: 14 } };
+
+        XLSX.utils.book_append_sheet(wb, ws, 'Batch Record');
+
+        const filename = 'Batch_Record_' + (d.namaDagang || d.kodeBarang).replace(/[^a-zA-Z0-9]/g, '_') + '_' + d.batch + '.xlsx';
+        XLSX.writeFile(wb, filename);
     }
 
     /* ═══════════════════════════════════════════ */
