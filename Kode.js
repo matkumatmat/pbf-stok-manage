@@ -76,6 +76,7 @@ function handleRequest(action, params) {
   switch (action) {
     case 'searchProduct':      return searchProduct(params.query);
     case 'getProductList':     return getProductList();
+    case 'getLastShipmentDate': return getLastShipmentDate();
     case 'getProductDetail':   return getProductDetail(params.kodeBarang);
     case 'getPengiriman':      return getPengiriman(params.startDate, params.endDate, params.konsumen, params.kota);
     case 'getCycleCount':      return getCycleCount(params.tanggal);
@@ -86,10 +87,12 @@ function handleRequest(action, params) {
     case 'getEmbalageList':      return getEmbalageList();
     case 'getEmbalagePenerimaan': return getEmbalagePenerimaan();
     case 'addEmbalagePenerimaan': return addEmbalagePenerimaan(params);
+    case 'addEmbalagePengeluaran': return addEmbalagePengeluaran(params);
     case 'getEmbalageDashboard':  return getEmbalageDashboard();
     case 'getEmbalagePengeluaran': return getEmbalagePengeluaran(params.page, params.pageSize);
     case 'getDistribusiHistory':  return getDistribusiHistory(params.page, params.pageSize);
     case 'getDistribusiDetail':   return getDistribusiDetail(params.tanggal, params.tujuan);
+    case 'getStockPivotExport': return getStockPivotExport();
     default: return { error: 'Unknown action: ' + action };
   }
 }
@@ -170,26 +173,68 @@ function searchProduct(query) {
  * Return ALL products from PRODUK sheet (for initial load)
  */
 function getProductList() {
-  var sh = SpreadsheetApp.openById(SS_ID).getSheetByName(SH_PRODUK);
-  var data = sh.getDataRange().getValues();
-  var results = [];
+  var ss = SpreadsheetApp.openById(SS_ID);
+  var shProduk = ss.getSheetByName(SH_PRODUK);
+  var produkData = shProduk.getDataRange().getValues();
 
-  for (var i = 1; i < data.length; i++) {
-    var row = data[i];
-    if (!row[PR_KODE_BARU]) continue;
+  var shMaster = ss.getSheetByName(SH_MASTER);
+  var masterData = shMaster.getDataRange().getValues();
+
+  // Calculate stock per kode
+  var stockMap = {};
+  for (var i = 3; i < masterData.length; i++) {
+    var row = masterData[i];
+    var kode = str(row[MD_KODE]);
+    if (!kode) continue;
+
+    if (!stockMap[kode]) stockMap[kode] = { pen: 0, dist: 0 };
+    stockMap[kode].pen += num(row[MD_PEN]);
+    stockMap[kode].dist += num(row[MD_DIST]);
+  }
+
+  var results = [];
+  for (var i = 1; i < produkData.length; i++) {
+    var row = produkData[i];
+    var kode = str(row[PR_KODE_BARU]);
+    if (!kode) continue;
+
+    var stock = stockMap[kode] || { pen: 0, dist: 0 };
+    var totalStok = stock.pen - stock.dist;
+
     results.push({
       kodeLama:   str(row[PR_KODE_LAMA]),
-      kodeBaru:   str(row[PR_KODE_BARU]),
+      kodeBaru:   kode,
       namaDagang: str(row[PR_NAMA_DAGANG]),
       namaERP:    str(row[PR_NAMA_ERP]),
       kategori:   str(row[PR_KATEGORI]),
       jenis:      str(row[PR_JENIS]),
       hjp:        num(row[PR_HJP]),
-      het:        num(row[PR_HET])
+      het:        num(row[PR_HET]),
+      stok:       totalStok
     });
   }
 
   return { results: results };
+}
+
+function getLastShipmentDate() {
+  try {
+    var sh = SpreadsheetApp.openById(SS_ID).getSheetByName(SH_MASTER);
+    var data = sh.getDataRange().getValues();
+
+    var maxDate = null;
+    for (var i = 3; i < data.length; i++) {
+      var tgl = data[i][MD_TGL];
+      if (!(tgl instanceof Date)) continue;
+      if (!maxDate || tgl > maxDate) {
+        maxDate = tgl;
+      }
+    }
+
+    return { lastShipment: maxDate ? fmtDate(maxDate) : null };
+  } catch(e) {
+    return { lastShipment: null, error: e.message };
+  }
 }
 
 function lookupProduk(produkData, kodeBarang) {
@@ -708,6 +753,40 @@ function addEmbalagePenerimaan(params) {
   sh.getRange(nextRow, 9).setValue(params.keterangan || '');   // I: Keterangan
 
   // Update D3:D4 (UPDATED AT / UPDATED BY)
+  sh.getRange('D3').setValue(new Date());
+  sh.getRange('D4').setValue('Web App');
+
+  return { success: true, row: nextRow, no: newNo };
+}
+
+function addEmbalagePengeluaran(params) {
+  var sh = SpreadsheetApp.openById(SS_ID).getSheetByName('MASTER EMBALAGE');
+  var data = sh.getDataRange().getValues();
+
+  // Find next empty row on RIGHT side (check col M = idx 12)
+  var nextRow = -1;
+  var lastNo = 0;
+  for (var i = 5; i < data.length; i++) {
+    if (data[i][12]) { // col M has date = row is filled
+      lastNo = num(data[i][10]); // col K = No
+    } else {
+      nextRow = i + 1;
+      break;
+    }
+  }
+  if (nextRow === -1) nextRow = data.length + 1;
+
+  // Write data: cols K-R (11-18)
+  var newNo = lastNo + 1;
+  sh.getRange(nextRow, 11).setValue(newNo);
+  sh.getRange(nextRow, 12).setValue(params.noPacking || '');
+  sh.getRange(nextRow, 13).setValue(new Date(params.tanggal));
+  sh.getRange(nextRow, 14).setValue(params.kode);
+  sh.getRange(nextRow, 15).setValue(params.nama);
+  sh.getRange(nextRow, 16).setValue(Number(params.jumlah));
+  sh.getRange(nextRow, 17).setValue(params.satuan);
+  sh.getRange(nextRow, 18).setValue(params.keterangan || '');
+
   sh.getRange('D3').setValue(new Date());
   sh.getRange('D4').setValue('Web App');
 

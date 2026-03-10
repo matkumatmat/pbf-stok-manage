@@ -11,3 +11,9 @@ npm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# Notes
+Notes.md
+
+#text
+*.txt

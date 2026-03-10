@@ -123,11 +123,15 @@
     <!-- Top Header (brand only) -->
     <header class="fixed top-0 inset-x-0 nav-glass border-b border-slate-200/60 z-50">
         <div class="max-w-5xl mx-auto px-5 flex items-center justify-between h-12">
-            <div class="flex items-center gap-2.5">
+            <div class="flex items-center gap-3">
                 <div class="w-6 h-6 bg-sky-600 rounded-md flex items-center justify-center">
                     <div color="white" data-lucide="package" class="w-4 h-4"></div>
                 </div>
                 <span class="font-bold text-xs tracking-tight text-slate-900 uppercase">PBF System</span>
+                <span class="hidden md:inline-block w-px h-4 bg-slate-300"></span>
+                <span id="last-shipment" class="hidden md:inline-block text-[9px] text-slate-400 font-semibold uppercase tracking-wider">
+                    Last Update: <span id="last-shipment-date" class="text-sky-600">--</span>
+                </span>
             </div>
             <div class="flex items-center gap-3">
                 <span id="user-name" class="hidden sm:inline-block text-[10px] text-slate-500 font-semibold uppercase tracking-wider"></span>
@@ -186,9 +190,15 @@
 
             <!-- Search Results -->
             <div id="search-results" class="hidden space-y-3">
-                <div class="flex items-center justify-between px-1">
+                <div class="flex items-center justify-between px-1 mb-2">
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hasil Pencarian</span>
-                    <span id="result-count" class="text-[10px] text-slate-400"></span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="exportStockPivot()" id="stock-export-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-[9px] font-bold rounded-lg hover:bg-emerald-700 active:scale-[0.97] transition-all">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Export Stok
+                        </button>
+                        <span id="result-count" class="text-[10px] text-slate-400"></span>
+                    </div>
                 </div>
                 <div id="result-list" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
             </div>
@@ -644,6 +654,41 @@
             <!-- OUTPUT (Pengeluaran history) -->
             <div id="emb-output" class="hidden space-y-4">
                 <h3 class="text-xs font-bold text-slate-900">Riwayat Pengeluaran Embalage</h3>
+
+                <!-- Output Form -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                    <h3 class="text-xs font-bold text-slate-900">Input Pengeluaran Embalage</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Tanggal</label>
+                            <input type="date" id="emb-out-tgl" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">No. Packing</label>
+                            <input type="text" id="emb-out-packing" placeholder="Opsional" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Barang</label>
+                            <select id="emb-out-barang" onchange="onEmbOutBarangChange()" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                                <option value="">Pilih barang...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Jumlah</label>
+                            <input type="number" id="emb-out-jumlah" min="0" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Satuan</label>
+                            <input type="text" id="emb-out-satuan" readonly class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-500">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Keterangan</label>
+                            <input type="text" id="emb-out-ket" placeholder="Opsional" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-sky-500/30">
+                        </div>
+                    </div>
+                    <button onclick="submitEmbalagePengeluaran()" id="emb-out-submit" class="w-full bg-red-600 text-white text-xs font-semibold py-2.5 rounded-lg hover:bg-red-700 active:scale-[0.97] transition-all">Simpan Pengeluaran</button>
+                </div>
+
                 <div id="emb-out-loading" class="hidden py-10 flex justify-center"><div class="spinner"><div></div><div></div><div></div><div></div><div></div><div></div></div></div>
                 <div id="emb-out-content" class="hidden space-y-3">
                     <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
@@ -846,6 +891,18 @@
             .handleRequest('getProductList', {});
     }
 
+    function loadLastShipmentDate() {
+        google.script.run
+            .withSuccessHandler(res => {
+                if (res.lastShipment) {
+                    document.getElementById('last-shipment-date').innerText = fmtD(res.lastShipment);
+                    show('last-shipment');
+                }
+            })
+            .withFailureHandler(() => {}) // Silent fail
+            .handleRequest('getLastShipmentDate', {});
+    }
+
     let filterTimer = null;
     function filterProducts() {
         clearTimeout(filterTimer);
@@ -891,10 +948,22 @@
             const card = document.createElement('div');
             card.className = 'bg-white p-4 border border-slate-200 rounded-xl cursor-pointer card-hover group';
             card.onclick = () => loadDetail(item.kodeBaru);
+
+            // Stock badge color logic
+            const stok = item.stok !== undefined ? item.stok : null;
+            let stockBadge = '';
+            if (stok !== null) {
+                const stockClass = stok > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500';
+                stockBadge = `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${stockClass}">Stok: ${fmtN(stok)}</span>`;
+            }
+
             card.innerHTML = `
                 <div class="flex justify-between items-start gap-2">
                     <h4 class="text-[11px] font-bold text-slate-900 group-hover:text-sky-600 transition-colors leading-snug">${item.namaDagang}</h4>
-                    <span class="text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded shrink-0">${item.kodeBaru}</span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        ${stockBadge}
+                        <span class="text-[9px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">${item.kodeBaru}</span>
+                    </div>
                 </div>
                 <div class="mt-2 flex items-center gap-1.5 flex-wrap">
                     <span class="text-[9px] font-bold text-slate-400 uppercase">${item.kategori}</span>
@@ -1265,6 +1334,87 @@
     }
 
     /* ═══════════════════════════════════════════ */
+    /* STOCK PIVOT EXPORT                         */
+    /* ═══════════════════════════════════════════ */
+
+    function exportStockPivot() {
+        err(null);
+        const btn = document.getElementById('stock-export-btn');
+        const origText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Exporting...';
+
+        google.script.run
+            .withSuccessHandler(res => {
+                btn.disabled = false;
+                btn.innerHTML = origText;
+
+                if (!res.success || !res.items || res.items.length === 0) {
+                    err('Tidak ada data untuk diekspor.');
+                    return;
+                }
+
+                // Build worksheet data
+                const wsData = [
+                    ['STOCK PIVOT REPORT'],
+                    ['Generated: ' + new Date().toLocaleString('id-ID')],
+                    [],
+                    ['Kategori', 'Kode Barang', 'Nama Barang', 'Nama Dagang', 'Batch', 'MFG Date', 'Expire Date', 'RSL (Bulan)', 'Penerimaan', 'Distribusi', 'Stok']
+                ];
+
+                res.items.forEach(item => {
+                    wsData.push([
+                        item.kategori,
+                        item.kodeBarang,
+                        item.namaBarang,
+                        item.namaDagang,
+                        item.batch,
+                        item.mfg,
+                        item.expire,
+                        item.rsl,
+                        item.penerimaan,
+                        item.distribusi,
+                        item.stok
+                    ]);
+                });
+
+                // Create workbook
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                // Column widths
+                ws['!cols'] = [
+                    {wch: 12},  // Kategori
+                    {wch: 14},  // Kode Barang
+                    {wch: 28},  // Nama Barang
+                    {wch: 28},  // Nama Dagang
+                    {wch: 16},  // Batch
+                    {wch: 12},  // MFG Date
+                    {wch: 12},  // Expire Date
+                    {wch: 12},  // RSL
+                    {wch: 12},  // Penerimaan
+                    {wch: 12},  // Distribusi
+                    {wch: 12}   // Stok
+                ];
+
+                // Bold headers
+                if(ws['A1']) ws['A1'].s = { font: { bold: true, sz: 14 } };
+                if(ws['A4']) ws['A4'].s = { font: { bold: true } };
+
+                XLSX.utils.book_append_sheet(wb, ws, 'Stock Pivot');
+
+                const filename = 'Stock_Pivot_' + new Date().toISOString().split('T')[0] + '.xlsx';
+                XLSX.writeFile(wb, filename);
+            })
+            .withFailureHandler(e => {
+                btn.disabled = false;
+                btn.innerHTML = origText;
+                err('Gagal mengekspor: ' + e.message);
+            })
+            .handleRequest('getStockPivotExport', {});
+    }
+
+    /* ═══════════════════════════════════════════ */
     /* EMBALAGE: DASHBOARD                        */
     /* ═══════════════════════════════════════════ */
 
@@ -1443,8 +1593,70 @@
     /* EMBALAGE: OUTPUT (Pengeluaran history)      */
     /* ═══════════════════════════════════════════ */
 
+    function onEmbOutBarangChange() {
+        const val = document.getElementById('emb-out-barang').value;
+        if(!val) { document.getElementById('emb-out-satuan').value = ''; return; }
+        const item = JSON.parse(val);
+        document.getElementById('emb-out-satuan').value = item.satuan;
+    }
+
+    function submitEmbalagePengeluaran() {
+        const barangVal = document.getElementById('emb-out-barang').value;
+        const tgl = document.getElementById('emb-out-tgl').value;
+        const jumlah = document.getElementById('emb-out-jumlah').value;
+
+        if(!barangVal || !tgl || !jumlah) { err('Lengkapi tanggal, barang, dan jumlah.'); return; }
+
+        const item = JSON.parse(barangVal);
+        const btn = document.getElementById('emb-out-submit');
+        btn.disabled = true; btn.innerText = 'Menyimpan...';
+
+        google.script.run
+            .withSuccessHandler(res => {
+                btn.disabled = false; btn.innerText = 'Simpan Pengeluaran';
+                if(res.success) {
+                    document.getElementById('emb-out-jumlah').value = '';
+                    document.getElementById('emb-out-packing').value = '';
+                    document.getElementById('emb-out-ket').value = '';
+                    document.getElementById('emb-out-barang').value = '';
+                    document.getElementById('emb-out-satuan').value = '';
+                    embDashLoaded = false;
+                    loadPengeluaranHistory(embOutPage);
+                }
+            })
+            .withFailureHandler(e => { btn.disabled = false; btn.innerText = 'Simpan Pengeluaran'; err('Gagal: ' + e.message); })
+            .handleRequest('addEmbalagePengeluaran', {
+                tanggal: tgl,
+                noPacking: document.getElementById('emb-out-packing').value,
+                kode: item.kode,
+                nama: item.nama,
+                jumlah: jumlah,
+                satuan: item.satuan,
+                keterangan: document.getElementById('emb-out-ket').value
+            });
+    }
+
     function loadPengeluaranHistory(page) {
         embOutPage = page || 1;
+
+        // Populate dropdown if not already done
+        if(!embItemList.length) {
+            google.script.run
+                .withSuccessHandler(res => {
+                    embItemList = res.items || [];
+                    const sel = document.getElementById('emb-out-barang');
+                    sel.innerHTML = '<option value="">Pilih barang...</option>';
+                    embItemList.forEach(item => {
+                        const opt = document.createElement('option');
+                        opt.value = JSON.stringify({ kode: item.kode, nama: item.nama, satuan: item.satuan });
+                        opt.textContent = item.nama + (item.kode ? ' [' + item.kode + ']' : '');
+                        sel.appendChild(opt);
+                    });
+                    document.getElementById('emb-out-tgl').value = today();
+                })
+                .handleRequest('getEmbalageList', {});
+        }
+
         show('emb-out-loading'); hide('emb-out-content');
         google.script.run
             .withSuccessHandler(onPengeluaran)
@@ -1688,6 +1900,7 @@
         } else {
             // Has session - load app data
             loadAllProducts();
+            loadLastShipmentDate();
         }
 
         lucide.createIcons();
